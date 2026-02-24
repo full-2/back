@@ -4,12 +4,14 @@ import bcrypt from "bcrypt"
 import { JwtPayload } from 'src/type/auth.type';
 import { TokenDTO } from 'src/domain/auth/dto/auth.dto';
 import { JwtTokenService } from '../jwt/jwt.service';
+import { RedisService } from '../redis/redis.service';
 // 회원 검증과 관련된 서비스
 @Injectable()
 export class AuthService {
   constructor(
     private readonly memberRepository: MemberRepository,
-    private readonly jwtTokenService:JwtTokenService
+    private readonly jwtTokenService:JwtTokenService,
+    private readonly redisService:RedisService
   ){;}
 
   // 비밀번호 해싱
@@ -34,6 +36,16 @@ export class AuthService {
   }
 
   // 로그아웃
-  
+  async logout(refreshToken: string){
+    let isLogout = false;
+    try {
+      const payload = await this.jwtTokenService.verifyAndExtractPayload(refreshToken);
+      await this.redisService.deleteRefreshToken(payload);
+      isLogout =true
+    } catch (err) {
+      isLogout=false
+    }
+    return isLogout
+  }
 
 }

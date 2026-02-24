@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { MemberRepository } from 'src/repository/member/member.repository';
 import { AuthService } from '../auth/auth.service';
 import {
@@ -23,6 +23,7 @@ import { S3Service } from '../s3/s3.service';
 export class MemberService {
   constructor(
     private readonly memberRepository: MemberRepository,
+    @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
     private readonly s3Service: S3Service,
   ) {}
@@ -60,6 +61,23 @@ export class MemberService {
     });
   }
 
+  // 회원 단일 조회
+  // 회원 단일 조회
+  async getMember(id: number): Promise<MemberResponse> {
+    const member = await this.memberRepository.findMemberById(id);
+
+    if (!member) {
+      throw new MemberException('멤버를 찾을 수 없습니다.');
+    }
+
+    // 새로운 객체 반환(타입 오류 해결)
+    const newMember = {
+      ...member,
+      socials: member.socials.map(({ memberPassword, ...rest }) => rest),
+    };
+    return newMember;
+  }
+
   // 회원 전체 목록 조회
   async getMembers(): Promise<MemberResponse[]> {
     const members = await this.memberRepository.findMemberAll();
@@ -78,23 +96,26 @@ export class MemberService {
     thumbnail: MulterFile,
     member: MemberUpdateDTO,
   ) {
-    if(thumbnail){
-      const s3Result = await this.s3Service.uploadFile(thumbnail, "profiles")
+    if (thumbnail) {
+      const s3Result = await this.s3Service.uploadFile(thumbnail, 'profiles');
 
       // 회원정보 검색 및 업데이트
-      const foundMember = await this.memberRepository.findMemberById(id)
-      if(!foundMember){ throw new MemberException("member service updateProfile 회원 조회 실패")}
+      const foundMember = await this.memberRepository.findMemberById(id);
+      if (!foundMember) {
+        throw new MemberException(
+          'member service updateProfile 회원 조회 실패',
+        );
+      }
 
-      console.log(`S3 업로드 성공 : 원본 URL : ${s3Result.originalUrl}`)
-      console.log(`S3 업로드 성공 : 썸네일 URL : ${s3Result.thumbnailUrl}`)
+      console.log(`S3 업로드 성공 : 원본 URL : ${s3Result.originalUrl}`);
+      console.log(`S3 업로드 성공 : 썸네일 URL : ${s3Result.thumbnailUrl}`);
       await this.memberRepository.updateProfile(id, {
         memberName: foundMember.memberName,
-        memberProfile: s3Result.originalUrl
-      })
+        memberProfile: s3Result.originalUrl,
+      });
     }
 
     return await this.memberRepository.findMemberById(id);
-
   }
 
   // 회원 정보 수정

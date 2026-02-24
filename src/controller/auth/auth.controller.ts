@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { ApiResponse } from 'src/common/dto/api-response.dto';
@@ -49,6 +49,7 @@ export class AuthController {
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
+    // console.log(req.cookies)
     const refreshToken = req.cookies['refreshToken'];
     // Redis 삭제
     const isLogin = await this.authService.logout(refreshToken);
@@ -71,4 +72,45 @@ export class AuthController {
 
     return new ApiResponse('로그아웃이 완료되었습니다.');
   }
+
+  // me라는 컨트롤러 내정보를 가져오는 거임
+  @ApiOperation({ summary: 'AccessToken으로 유저의 정보를 반환' })
+  @Get("me")
+  async me(@Req() req:AuthRequest){
+    const { accessToken } = req.cookies;
+    if(!accessToken) throw new UnauthorizedException();
+
+    const foundMember = await this.authService.me(accessToken)
+    return new ApiResponse("회원 조회 성공", foundMember)
+  }
+
+  // AccessToken 재발급
+  @ApiOperation({ summary: 'AccessToken 재발급 로직' })
+  async refresh(
+    @Req() req:AuthRequest,
+    @Res({passthrough:true}) res: Response
+  ){
+    const { refreshToken } = req.cookies
+    if(!refreshToken) throw new UnauthorizedException("RefreshToken이 없습니다")
+
+    const {accessToken} = await this.authService.refresh(refreshToken)
+    
+    res.clearCookie('accessToken', {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+    });
+
+    return new ApiResponse("Access Token 재발급 완료")
+  }
+
+
+
+
+
+
+
+
+
+
 }

@@ -36,8 +36,8 @@ model AuthAccount {
   id               Int          @id @default(autoincrement())
   memberProvider   AuthProvider
   memberProviderId String?
-  memberPassword   String?
   memberId         Int
+  memberPassword   String?
   member           Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([memberProviderId, memberId])

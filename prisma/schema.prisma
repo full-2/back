@@ -11,20 +11,23 @@ datasource db {
 //2. dto
 
 model Member {
-  id             Int              @id @default(autoincrement())
-  memberEmail    String           @unique
-  memberName     String
-  memberRole     MemberRole       @default(USER)
-  memberNickname String?
-  memberProfile  String?
-  memberIntro    String?
-  memberInactive Boolean?         @default(false)
-  inactiveReason String?
-  memberCreateAt DateTime         @default(now())
+  id              Int                  @id @default(autoincrement())
+  memberEmail     String               @unique
+  memberName      String
+  memberRole      MemberRole           @default(USER)
+  memberNickname  String?
+  memberProfile   String?
+  memberIntro     String?
+  memberInactive  Boolean?             @default(false)
+  inactiveReason  String?
+  memberCreateAt  DateTime             @default(now())
   socials         AuthAccount[]
   memberLocations MemberLocation[]
   safeScores      SafeScore[]
-  recentRegions   MemberRecentRegion[]
+  recentRegions       MemberRecentRegion[]
+  providePosts        ProvidePost[]
+  providePostLikes    ProvidePostLike[]
+  providePostBookmarks ProvidePostBookmark[]
 
   @@map("member")
 }
@@ -33,6 +36,15 @@ model Member {
 enum MemberRole {
   USER
   ADMIN
+}
+
+/// 자취 정보 분류 (UI 칩과 1:1, "전체"는 클라이언트 필터 전용·DB 미저장)
+enum ProvidePostCategory {
+  LIFE_INFO // 생활정보
+  GOVERNMENT_SUPPORT // 정부 지원 사업
+  HOUSING_CONTRACT // 주거·계약
+  SAFETY // 안전·치안
+  OTHER // 기타
 }
 
 // 소셜 로그인 계정
@@ -58,39 +70,39 @@ enum AuthProvider {
 
 // 즐겨찾기 지역 (카카오맵 연동·안전점수용)
 model MemberLocation {
-  id        Int      @id @default(autoincrement())
-  memberId  Int
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  MemberLocationSi        String?  // 시
-  MemberLocationGu        String?  // 구
-  MemberLocationDong      String?  // 동
+  id                      Int       @id @default(autoincrement())
+  memberId                Int
+  member                  Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  MemberLocationSi        String? // 시
+  MemberLocationGu        String? // 구
+  MemberLocationDong      String? // 동
   MemberLocationLatitude  Decimal? // 위도 (카카오맵·거리 계산용)
   MemberLocationLongitude Decimal? // 경도
-  createdAt DateTime? @default(now())
+  createdAt               DateTime? @default(now())
 
   @@map("tbl_member_location")
 }
 
 // 안전점수 (카카오맵·위치 기반 계산 결과 저장)
 model SafeScore {
-  id                  Int      @id @default(autoincrement())
-  memberId            Int
-  member              Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  address             String?  // 화면 표시용 주소 (예: 경남 창원시 진해구 명제로 478)
-  score               Int      // 총점 (0~100)
-  safetyMessage       String?  // "밤에도 비교적 안전한 지역!"
-  rankingPercentile   Int?     // 전국 상위 % (예: 18)
+  id                Int      @id @default(autoincrement())
+  memberId          Int
+  member            Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  address           String? // 화면 표시용 주소 (예: 경남 창원시 진해구 명제로 478)
+  score             Int // 총점 (0~100)
+  safetyMessage     String? // "밤에도 비교적 안전한 지역!"
+  rankingPercentile Int? // 전국 상위 % (예: 18)
   // 항목별 점수
-  cctvScore           Int?
-  policeScore         Int?
-  streetlightScore    Int?
-  crimeProneScore     Int?
+  cctvScore         Int?
+  policeScore       Int?
+  streetlightScore  Int?
+  crimeProneScore   Int?
   // 설명용 개수 (이 점수는 왜 이렇게 나왔나요?)
-  cctvCount           Int?
-  policeCount         Int?
-  streetlightCount    Int?
-  crimeProneCount     Int?
-  createdAt           DateTime @default(now())
+  cctvCount         Int?
+  policeCount       Int?
+  streetlightCount  Int?
+  crimeProneCount   Int?
+  createdAt         DateTime @default(now())
 
   @@map("tbl_safe_score")
 }
@@ -100,10 +112,77 @@ model MemberRecentRegion {
   id        Int      @id @default(autoincrement())
   memberId  Int
   member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  address   String   // 화면 표시용 (예: 서울특별시 관악구 신림동)
+  address   String // 화면 표시용 (예: 서울특별시 관악구 신림동)
   latitude  Decimal? // 다시보기 시 지도/점수 조회용
   longitude Decimal?
   viewedAt  DateTime @default(now()) // 마지막 확인 시각
 
   @@map("tbl_member_recent_region")
+}
+
+// 정보제공 게시글
+model ProvidePost {
+  id             Int       @id @default(autoincrement())
+  memberId       Int
+  member         Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  region         String
+  category       ProvidePostCategory @default(LIFE_INFO)
+  title          String    
+  content        String    
+  thumbnailUrl   String?
+  tags           String?
+  likeCount      Int?
+  bookmarkCount  Int?
+  createdAt      DateTime? @default(now())
+  updatedAt      DateTime? @updatedAt
+  deletedAt      DateTime? // 소프트 삭제: 삭제 시 업데이트 권장
+
+  images    ProvidePostImage[]
+  likes     ProvidePostLike[]
+  bookmarks ProvidePostBookmark[]
+
+  @@index([memberId])
+  @@index([deletedAt])
+  @@map("tbl_provide_post")
+}
+
+// 게시글 첨부 이미지
+model ProvidePostImage {
+  id             Int         @id @default(autoincrement())
+  providePostId  Int
+  providePost    ProvidePost @relation(fields: [providePostId], references: [id], onDelete: Cascade)
+  originalName   String
+  fileName       String?
+  isThumbnail    Boolean? // TRUE=1 / FALSE=0
+
+  @@index([providePostId])
+  @@map("tbl_provide_post_images")
+}
+
+// 게시글 좋아요 (회원당 1회)
+model ProvidePostLike {
+  id            Int         @id @default(autoincrement())
+  providePostId Int
+  providePost   ProvidePost @relation(fields: [providePostId], references: [id], onDelete: Cascade)
+  memberId      Int
+  member        Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt     DateTime?   @default(now())
+
+  @@unique([providePostId, memberId])
+  @@index([memberId])
+  @@map("tbl_provide_post_like")
+}
+
+// 게시글 북마크 (회원당 1회)
+model ProvidePostBookmark {
+  id            Int         @id @default(autoincrement())
+  providePostId Int
+  providePost   ProvidePost @relation(fields: [providePostId], references: [id], onDelete: Cascade)
+  memberId      Int
+  member        Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt     DateTime?   @default(now())
+
+  @@unique([providePostId, memberId])
+  @@index([memberId])
+  @@map("tbl_provide_post_bookmark")
 }

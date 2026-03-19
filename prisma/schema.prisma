@@ -11,20 +11,31 @@ datasource db {
 //2. dto
 
 model Member {
-  id             Int              @id @default(autoincrement())
-  memberEmail    String           @unique
-  memberName     String
-  memberRole     MemberRole       @default(USER)
-  memberNickname String?
-  memberProfile  String?
-  memberIntro    String?
-  memberInactive Boolean?         @default(false)
-  inactiveReason String?
-  memberCreateAt DateTime         @default(now())
-  socials         AuthAccount[]
-  memberLocations MemberLocation[]
-  safeScores      SafeScore[]
-  recentRegions   MemberRecentRegion[]
+  id                         Int                         @id @default(autoincrement())
+  memberEmail                String                      @unique
+  memberName                 String
+  memberRole                 MemberRole                  @default(USER)
+  memberNickname             String?
+  memberProfile              String?
+  memberIntro                String?
+  memberInactive             Boolean?                    @default(false)
+  inactiveReason             String?
+  memberCreateAt             DateTime                    @default(now())
+  socials                    AuthAccount[]
+  memberLocations            MemberLocation[]
+  safeScores                 SafeScore[]
+  recentRegions              MemberRecentRegion[]
+  providePosts               ProvidePost[]
+  providePostLikes           ProvidePostLike[]
+  providePostBookmarks       ProvidePostBookmark[]
+  communityPosts             CommunityPost[]
+  communityPostLikes         CommunityPostLike[]
+  communityPostBookmarks     CommunityPostBookmark[]
+  communityComments          CommunityComment[]
+  communityCommentReplies    CommunityCommentReply[]
+  communityCommentLikes      CommunityCommentLike[]
+  communityCommentReplyLikes CommunityCommentReplyLike[] @relation("ReplyLikeToMember")
+  reportsSubmitted           Report[]                    @relation("ReportReporter")
 
   @@map("member")
 }
@@ -35,9 +46,34 @@ enum MemberRole {
   ADMIN
 }
 
-// 소셜 로그인 계정
+/// 자취 정보 분류 (UI 칩과 1:1, "전체"는 클라이언트 필터 전용·DB 미저장)
+enum ProvidePostCategory {
+  LIFE_INFO // 생활정보
+  GOVERNMENT_SUPPORT // 정부 지원 사업
+  HOUSING_CONTRACT // 주거·계약
+  SAFETY // 안전·치안
+  OTHER // 기타
+}
+
+/// 커뮤니티 게시글 분류 (추가 시 enum 마이그레이션 또는 문자열 전환 검토)
+enum CommunityPostCategory {
+  GENERAL // 일반
+  QUESTION // 질문
+  TIP // 팁·노하우
+  SHARE // 공유
+  OTHER // 기타
+}
+
+/// 신고 처리 상태
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  REJECTED
+}
+
+// 소셜 로그인 계정 
 model AuthAccount {
-  id               Int          @id @default(autoincrement())
+  id               Int          @id @default(autoincrement()) @map("auth_account_id")
   memberProvider   AuthProvider
   memberProviderId String?
   memberId         Int
@@ -56,54 +92,291 @@ enum AuthProvider {
   NAVER
 }
 
-// 즐겨찾기 지역 (카카오맵 연동·안전점수용)
+// 즐겨찾기 지역
 model MemberLocation {
-  id        Int      @id @default(autoincrement())
-  memberId  Int
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  MemberLocationSi        String?  // 시
-  MemberLocationGu        String?  // 구
-  MemberLocationDong      String?  // 동
-  MemberLocationLatitude  Decimal? // 위도 (카카오맵·거리 계산용)
-  MemberLocationLongitude Decimal? // 경도
-  createdAt DateTime? @default(now())
+  id                      Int             @id @default(autoincrement())
+  memberId                Int
+  member                  Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  MemberLocationSi        String?
+  MemberLocationGu        String?
+  MemberLocationDong      String?
+  MemberLocationLatitude  Decimal?
+  MemberLocationLongitude Decimal?
+  createdAt               DateTime?       @default(now())
+  communityPosts          CommunityPost[]
 
   @@map("tbl_member_location")
 }
 
-// 안전점수 (카카오맵·위치 기반 계산 결과 저장)
+// 안전점수
 model SafeScore {
-  id                  Int      @id @default(autoincrement())
-  memberId            Int
-  member              Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  address             String?  // 화면 표시용 주소 (예: 경남 창원시 진해구 명제로 478)
-  score               Int      // 총점 (0~100)
-  safetyMessage       String?  // "밤에도 비교적 안전한 지역!"
-  rankingPercentile   Int?     // 전국 상위 % (예: 18)
+  id                Int      @id @default(autoincrement())
+  memberId          Int
+  member            Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  address           String?
+  score             Int
+  safetyMessage     String?
+  rankingPercentile Int?
   // 항목별 점수
-  cctvScore           Int?
-  policeScore         Int?
-  streetlightScore    Int?
-  crimeProneScore     Int?
+  cctvScore         Int?
+  policeScore       Int?
+  streetlightScore  Int?
+  crimeProneScore   Int?
   // 설명용 개수 (이 점수는 왜 이렇게 나왔나요?)
-  cctvCount           Int?
-  policeCount         Int?
-  streetlightCount    Int?
-  crimeProneCount     Int?
-  createdAt           DateTime @default(now())
+  cctvCount         Int?
+  policeCount       Int?
+  streetlightCount  Int?
+  crimeProneCount   Int?
+  createdAt         DateTime @default(now())
 
   @@map("tbl_safe_score")
 }
 
-// 최근 본 지역 (탭 리스트용)
+// 최근 본 지역 (탭 리스트용) 
 model MemberRecentRegion {
   id        Int      @id @default(autoincrement())
   memberId  Int
   member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  address   String   // 화면 표시용 (예: 서울특별시 관악구 신림동)
-  latitude  Decimal? // 다시보기 시 지도/점수 조회용
+  address   String
+  latitude  Decimal?
   longitude Decimal?
-  viewedAt  DateTime @default(now()) // 마지막 확인 시각
+  viewedAt  DateTime @default(now())
 
   @@map("tbl_member_recent_region")
+}
+
+// 정보제공 게시글
+model ProvidePost {
+  id            Int                 @id @default(autoincrement())
+  memberId      Int
+  member        Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  region        String
+  category      ProvidePostCategory @default(LIFE_INFO)
+  title         String
+  content       String
+  thumbnailUrl  String?
+  tags          String?
+  likeCount     Int?
+  bookmarkCount Int?
+  createdAt     DateTime?           @default(now())
+  updatedAt     DateTime?           @updatedAt
+  deletedAt     DateTime?           // 소프트 삭제: 삭제 시 업데이트 권장
+
+  images    ProvidePostImage[]
+  likes     ProvidePostLike[]
+  bookmarks ProvidePostBookmark[]
+
+  @@index([memberId])
+  @@index([deletedAt])
+  @@map("tbl_provide_post")
+}
+
+// 게시글 첨부 이미지
+model ProvidePostImage {
+  id            Int         @id @default(autoincrement())
+  providePostId Int
+  providePost   ProvidePost @relation(fields: [providePostId], references: [id], onDelete: Cascade)
+  originalName  String
+  fileName      String?
+  isThumbnail   Boolean? // TRUE=1 / FALSE=0
+
+  @@index([providePostId])
+  @@map("tbl_provide_post_images")
+}
+
+// 게시글 좋아요 (회원당 1회)
+model ProvidePostLike {
+  id            Int         @id @default(autoincrement())
+  providePostId Int
+  providePost   ProvidePost @relation(fields: [providePostId], references: [id], onDelete: Cascade)
+  memberId      Int
+  member        Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt     DateTime?   @default(now())
+
+  @@unique([providePostId, memberId])
+  @@index([memberId])
+  @@map("tbl_provide_post_like")
+}
+
+// 게시글 북마크 (회원당 1회)
+model ProvidePostBookmark {
+  id            Int         @id @default(autoincrement())
+  providePostId Int
+  providePost   ProvidePost @relation(fields: [providePostId], references: [id], onDelete: Cascade)
+  memberId      Int
+  member        Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt     DateTime?   @default(now())
+
+  @@unique([providePostId, memberId])
+  @@index([memberId])
+  @@map("tbl_provide_post_bookmark")
+}
+
+// 커뮤니티 게시글
+model CommunityPost {
+  id               Int                   @id @default(autoincrement())
+  memberId         Int
+  member           Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberLocationId Int
+  memberLocation   MemberLocation        @relation(fields: [memberLocationId], references: [id], onDelete: Restrict)
+  title            String
+  content          String
+  category         CommunityPostCategory @default(GENERAL)
+  thumbnailUrl     String?
+  readCount        Int?
+  likeCount        Int?
+  commentCount     Int?
+  bookmarkCount    Int?
+  createdAt        DateTime?             @default(now())
+  updatedAt        DateTime?             @updatedAt
+    deletedAt        DateTime? // 소프트 삭제
+
+  images    CommunityPostImage[]
+  likes     CommunityPostLike[]
+  bookmarks CommunityPostBookmark[]
+  comments  CommunityComment[]
+  reports   Report[]
+
+  @@index([memberId])
+  @@index([memberLocationId])
+  @@index([deletedAt])
+  @@map("tbl_community_post")
+}
+
+// 커뮤니티 게시글 첨부 이미지
+model CommunityPostImage {
+  id              Int           @id @default(autoincrement())
+  communityPostId Int
+  communityPost   CommunityPost @relation(fields: [communityPostId], references: [id], onDelete: Cascade)
+  originalName    String
+  fileName        String?
+  isThumbnail     Boolean?
+
+  @@index([communityPostId])
+  @@map("tbl_community_post_images")
+}
+
+// 커뮤니티 게시글 좋아요 (회원당 1회)
+model CommunityPostLike {
+  id              Int           @id @default(autoincrement())
+  communityPostId Int
+  communityPost   CommunityPost @relation(fields: [communityPostId], references: [id], onDelete: Cascade)
+  memberId        Int
+  member          Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt       DateTime?     @default(now())
+
+  @@unique([communityPostId, memberId])
+  @@index([memberId])
+  @@map("tbl_community_post_like")
+}
+
+// 커뮤니티 게시글 북마크 (회원당 1회)
+model CommunityPostBookmark {
+  id              Int           @id @default(autoincrement())
+  communityPostId Int
+  communityPost   CommunityPost @relation(fields: [communityPostId], references: [id], onDelete: Cascade)
+  memberId        Int
+  member          Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt       DateTime?     @default(now())
+
+  @@unique([communityPostId, memberId])
+  @@index([memberId])
+  @@map("tbl_community_post_bookmark")
+}
+
+// 커뮤니티 게시글 댓글 (답글은 CommunityCommentReply)
+model CommunityComment {
+  id              Int           @id @default(autoincrement())
+  communityPostId Int
+  post            CommunityPost @relation(fields: [communityPostId], references: [id], onDelete: Cascade)
+  memberId        Int
+  member          Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  content         String        @db.Text
+  likeCount       Int?
+  replyCount      Int?
+  isDeleted       Boolean?      @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime?     @updatedAt
+  deletedAt       DateTime?     
+
+  replies CommunityCommentReply[]
+  likes   CommunityCommentLike[]
+  reports Report[]
+
+  @@index([communityPostId])
+  @@index([memberId])
+  @@map("tbl_community_comment")
+}
+
+// 커뮤니티 게시글 댓글 답글
+model CommunityCommentReply {
+  id                 Int              @id @default(autoincrement())
+  communityCommentId Int
+  comment            CommunityComment @relation(fields: [communityCommentId], references: [id], onDelete: Cascade)
+  memberId           Int
+  member             Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  content            String           @db.Text
+  likeCount          Int?
+  isDeleted          Boolean?         @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime?        @updatedAt
+  deletedAt          DateTime?
+
+  likes   CommunityCommentReplyLike[] @relation("ReplyLikeToReply")
+  reports Report[]
+
+  @@index([communityCommentId])
+  @@index([memberId])
+  @@map("tbl_community_comment_reply")
+}
+
+// 커뮤니티 게시글 댓글 좋아요 (회원당 1회)
+model CommunityCommentLike {
+  id                 Int              @id @default(autoincrement())
+  communityCommentId Int
+  comment            CommunityComment @relation(fields: [communityCommentId], references: [id], onDelete: Cascade)
+  memberId           Int
+  member             Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt          DateTime?        @default(now())
+
+  @@unique([communityCommentId, memberId])
+  @@index([memberId])
+  @@map("tbl_community_comment_like")
+}
+
+// 커뮤니티 게시글 댓글 답글 좋아요 (회원당 1회)
+model CommunityCommentReplyLike {
+  id                      Int                   @id @default(autoincrement())
+  communityCommentReplyId Int
+  reply                   CommunityCommentReply @relation("ReplyLikeToReply", fields: [communityCommentReplyId], references: [id], onDelete: Cascade, map: "fk_cc_reply_like_reply")
+  memberId                Int
+  member                  Member                @relation("ReplyLikeToMember", fields: [memberId], references: [id], onDelete: Cascade, map: "fk_cc_reply_like_member")
+  createdAt               DateTime?             @default(now())
+
+  @@unique([communityCommentReplyId, memberId])
+  @@index([memberId])
+  @@map("tbl_community_comment_reply_like")
+}
+
+// 신고 (글·댓글·답글 중 최소 1개는 앱 로직에서 검증)
+model Report {
+  id                      Int                    @id @default(autoincrement())
+  reporterMemberId        Int
+  reporter                Member                 @relation("ReportReporter", fields: [reporterMemberId], references: [id], onDelete: Cascade)
+  communityPostId         Int?
+  post                    CommunityPost?         @relation(fields: [communityPostId], references: [id], onDelete: SetNull)
+  communityCommentId      Int?
+  comment                 CommunityComment?      @relation(fields: [communityCommentId], references: [id], onDelete: SetNull)
+  communityCommentReplyId Int?
+  reply                   CommunityCommentReply? @relation(fields: [communityCommentReplyId], references: [id], onDelete: SetNull)
+  reason                  String
+  status                  ReportStatus           @default(PENDING)
+  createdAt               DateTime               @default(now())
+
+  @@index([reporterMemberId])
+  @@index([communityPostId])
+  @@index([communityCommentId])
+  @@index([communityCommentReplyId])
+  @@index([status])
+  @@map("tbl_report")
 }

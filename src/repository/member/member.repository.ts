@@ -11,11 +11,10 @@ export class MemberRepository {
   //회원 추가
   // front 단에서 받은 member정보들 >> MemberRegisterDTO에 담긴것
   async save(member: MemberRegisterDTO): Promise<MemberEntity> {
+    // Prisma Member에 memberAge/memberAddress 없음 — DTO에만 있을 수 있음
     const memberCreate = {
       memberEmail: member.memberEmail,
       memberName: member.memberName,
-      memberAge: member.memberAge,
-      memberAddress: member.memberAddress,
       memberProfile: member.memberProfile,
     };
 
@@ -101,10 +100,10 @@ export class MemberRepository {
     id: number,
     member: MemberUpdateDTO,
   ): Promise<MemberEntity | null> {
-    const { memberPassword, ...removedPasswordMember } = member;
+    const { memberPassword, memberAge, memberAddress, ...data } = member;
 
     await this.prisma.member.update({
-      data: removedPasswordMember,
+      data,
       where: { id },
     });
 

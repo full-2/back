@@ -36,7 +36,7 @@
 
 ## 작업 순서
 
-### 1단계: Prisma Schema 설계 (가장 먼저, 전체 팀에 영향)
+### 1단계: Prisma Schema 설계 (가장 먼저, 전체 팀에 영향) ✅ 완료
 
 > 파일: `prisma/schema.prisma`
 
@@ -48,7 +48,7 @@
 
 ---
 
-### 2단계: DB 환경 설정 및 마이그레이션
+### 2단계: DB 환경 설정 및 마이그레이션 ✅ 완료(공유 작업 제외)
 
 > 파일: `.env`, 터미널 명령어
 
@@ -58,7 +58,7 @@
    npx prisma migrate dev --name init_all_tables
    npx prisma generate
    ```
-3. 팀원들에게 동일한 `.env` 템플릿 공유 (비밀키 제외)
+3. 팀원들에게 동일한 `.env` 템플릿 공유 (비밀키 제외) ⏳ 남음
 
 ---
 

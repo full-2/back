@@ -5,6 +5,7 @@ import { TokenDTO } from 'src/domain/auth/dto/auth.dto';
 import { JwtTokenService } from '../jwt/jwt.service';
 import { RedisService } from '../redis/redis.service';
 import { MemberService } from '../member/member.service';
+import { MemberRepository } from 'src/repository/member/member.repository';
 import { MemberResponse } from 'src/domain/member/dto/member.response';
 import {
   MemberRegisterDTO,
@@ -18,6 +19,7 @@ export class AuthService {
   constructor(
     private readonly jwtTokenService: JwtTokenService,
     private readonly redisService: RedisService,
+    private readonly memberRepository: MemberRepository,
     @Inject(forwardRef(() => MemberService))
     private readonly memberService: MemberService,
   ) {}
@@ -90,9 +92,9 @@ export class AuthService {
 
     // 1. memberProvider, memberProviderId 멤버로 조회
     const foundSocialMember =
-      await this.memberService.getMemberByMemberProvider(socialMember);
+      await this.memberRepository.findActiveByProvider(socialMember);
     const foundLocalMember =
-      await this.memberService.getMemberByMemberEmail(memberEmail);
+      await this.memberRepository.findActiveMemberByEmail(memberEmail);
 
     // 이미 가입된 회원이라면 -> 토큰 발급
     if (foundSocialMember) {

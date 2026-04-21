@@ -1,7 +1,12 @@
-import { Injectable } from "@nestjs/common";
-import { MemberRegisterDTO, MemberUpdateDTO, OAuthLoginDTO } from "src/domain/member/dto/member.dto";
-import { MemberEntity } from "src/domain/member/entity/member.entity";
-import { PrismaService } from "src/service/prisma/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { MemberRole } from '@prisma/client';
+import {
+  MemberRegisterDTO,
+  MemberUpdateDTO,
+  OAuthLoginDTO,
+} from 'src/domain/member/dto/member.dto';
+import { MemberEntity } from 'src/domain/member/entity/member.entity';
+import { PrismaService } from 'src/service/prisma/prisma.service';
 
 @Injectable()
 export class MemberRepository {
@@ -11,11 +16,16 @@ export class MemberRepository {
   //회원 추가
   // front 단에서 받은 member정보들 >> MemberRegisterDTO에 담긴것
   async save(member: MemberRegisterDTO): Promise<MemberEntity> {
-    // Prisma Member에 memberAge/memberAddress 없음 — DTO에만 있을 수 있음
     const memberCreate = {
       memberEmail: member.memberEmail,
       memberName: member.memberName,
-      memberProfile: member.memberProfile,
+      memberRole: MemberRole.USER,
+      memberNickname: null,
+      memberProfile: null,
+      memberIntro: null,
+      memberInactive: false,
+      inactiveReason: null,
+      memberCreateAt: new Date(),
     };
 
     //소셜 Auth
@@ -41,6 +51,9 @@ export class MemberRepository {
   //회원 전체 조회
   async findMemberAll(): Promise<MemberEntity[]> {
     return await this.prisma.member.findMany({
+      where: {
+        OR: [{ memberInactive: false }, { memberInactive: null }],
+      },
       include: {
         socials: true,
       },
@@ -88,11 +101,11 @@ export class MemberRepository {
   }
 
   // 회원 비밀번호 수정
-  async updatePassword(id: number, memberPassword:string):Promise<void> {
+  async updatePassword(id: number, memberPassword: string): Promise<void> {
     await this.prisma.authAccount.update({
       where: { id },
-      data:{ memberPassword }
-    })
+      data: { memberPassword },
+    });
   }
 
   // 회원 정보 수정
@@ -100,7 +113,7 @@ export class MemberRepository {
     id: number,
     member: MemberUpdateDTO,
   ): Promise<MemberEntity | null> {
-    const { memberPassword, memberAge, memberAddress, ...data } = member;
+    const { memberPassword, ...data } = member;
 
     await this.prisma.member.update({
       data,
@@ -113,13 +126,48 @@ export class MemberRepository {
   // 회원 삭제
   async delete(id: number) {
     try {
-      await this.prisma.member.delete({
+      await this.prisma.member.update({
         where: { id },
+        data: {
+          memberInactive: true,
+          inactiveReason: '회원 탈퇴',
+        },
       });
       return true;
     } catch (err) {
       console.log('member repository delete failed');
       return false;
     }
+  }
+
+  // 활성 회원인지 조회 (로그인용)
+  async findActiveMemberByEmail(
+    memberEmail: string,
+  ): Promise<MemberEntity | null> {
+    return this.prisma.member.findFirst({
+      where: {
+        memberEmail,
+        OR: [{ memberInactive: false }, { memberInactive: null }],
+      },
+      include: { socials: true },
+    });
+  }
+  // 소셜 로그인으로 로그인했을 때 회원을 조회하는 방법!
+  // 회원 단일 조회(Provider)
+  async findActiveByProvider(
+    socialMember: OAuthLoginDTO,
+  ): Promise<MemberEntity | null> {
+    return this.prisma.member.findFirst({
+      where: {
+        OR: [{ memberInactive: false }, { memberInactive: null }],
+        socials: {
+          some: {
+            memberProviderId: socialMember.memberProviderId,
+            memberProvider: socialMember.memberProvider,
+          },
+        },
+      },
+      include: { socials: true },
+    });
   }
 }

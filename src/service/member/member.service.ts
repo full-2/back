@@ -30,9 +30,15 @@ export class MemberService {
     const foundMember = await this.memberRepository.findMemberByMemberEmail(
       member.memberEmail,
     );
+    if (foundMember?.memberInactive) {
+      throw new MemberException('탈퇴한 계정입니다. 복구 절차를 이용해주세요.');
+    }
     if (foundMember) {
       // 3) 예외 처리
       throw new MemberException('이미 존재하는 회원입니다.');
+    }
+    if (member.memberProvider === AuthProvider.LOCAL && !member.memberPassword) {
+      throw new MemberException('로컬 회원가입은 비밀번호가 필요합니다.');
     }
     // 2) 비밀번호 암호화(bycrypt)
     let hashedPassword = member.memberPassword;

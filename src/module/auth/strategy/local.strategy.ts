@@ -22,23 +22,24 @@ export class LocalStrategy extends PassportStrategy(Strategy, 'local') {
 
   // 요청을 가로채서 validate를 실행시킴!
   async validate(loginMemberEmail: string, loginMemberPassword: string) {
+    const INVALID_CREDENTIALS = '이메일 또는 비밀번호가 일치하지 않습니다.';
+
     const foundMember =
       await this.memberRepository.findActiveMemberByEmail(loginMemberEmail);
-    if (!foundMember)
-      throw new MemberException('탈퇴했거나 존재하지 않는 회원입니다.');
+    if (!foundMember) throw new MemberException(INVALID_CREDENTIALS);
 
     const memberPassword = foundMember.socials.find(
       ({ memberProvider }) => memberProvider === 'LOCAL',
     )?.memberPassword;
     if (!memberPassword) {
-      throw new MemberException('로컬 로그인 계정이 아닙니다.');
+      throw new MemberException(INVALID_CREDENTIALS);
     }
 
     const isMatch = await this.authService.comparePassword(
       loginMemberPassword,
       memberPassword,
     );
-    if (!isMatch) throw new MemberException('비밀번호가 일치하지 않습니다.');
+    if (!isMatch) throw new MemberException(INVALID_CREDENTIALS);
 
     
 

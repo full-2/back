@@ -64,6 +64,17 @@ enum CommunityPostCategory {
   OTHER // 기타
 }
 
+// 신고 사유
+enum ReportReason {
+  ABUSE            // 욕설/비방
+  SPAM             // 도배
+  ADVERTISEMENT    // 홍보/상업성
+  SEXUAL           // 성적 콘텐츠
+  HATE             // 폭력적/혐오적 콘텐츠
+  MISINFORMATION   // 허위 정보/혼동을 야기하는 콘텐츠
+  ILLEGAL_CONTENT  // 불법촬영물
+}
+
 // 신고 처리 상태
 enum ReportStatus {
   PENDING
@@ -156,8 +167,9 @@ model ProvidePost {
   content       String
   thumbnailUrl  String?
   tags          String?
-  likeCount     Int?
-  bookmarkCount Int?
+  readCount     Int                 @default(0)
+  likeCount     Int                 @default(0)
+  bookmarkCount Int                 @default(0)
   createdAt     DateTime?           @default(now())
   updatedAt     DateTime?           @updatedAt
   deletedAt     DateTime? // 소프트 삭제: 삭제 시 업데이트 권장
@@ -223,10 +235,10 @@ model CommunityPost {
   content          String
   category         CommunityPostCategory @default(GENERAL)
   thumbnailUrl     String?
-  readCount        Int?
-  likeCount        Int?
-  commentCount     Int?
-  bookmarkCount    Int?
+  readCount        Int                   @default(0)
+  likeCount        Int                   @default(0)
+  commentCount     Int                   @default(0)
+  bookmarkCount    Int                   @default(0)
   createdAt        DateTime?             @default(now())
   updatedAt        DateTime?             @updatedAt
   deletedAt        DateTime?
@@ -292,8 +304,8 @@ model CommunityComment {
   memberId        Int
   member          Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
   content         String        @db.Text
-  likeCount       Int?
-  replyCount      Int?
+  likeCount       Int           @default(0)
+  replyCount      Int           @default(0)
   isDeleted       Boolean?      @default(false)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime?     @updatedAt
@@ -316,7 +328,7 @@ model CommunityCommentReply {
   memberId           Int
   member             Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
   content            String           @db.Text
-  likeCount          Int?
+  likeCount          Int              @default(0)
   isDeleted          Boolean?         @default(false)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime?        @updatedAt
@@ -369,7 +381,7 @@ model Report {
   comment                 CommunityComment?      @relation(fields: [communityCommentId], references: [id], onDelete: SetNull)
   communityCommentReplyId Int?
   reply                   CommunityCommentReply? @relation(fields: [communityCommentReplyId], references: [id], onDelete: SetNull)
-  reason                  String
+  reason                  ReportReason
   status                  ReportStatus           @default(PENDING)
   createdAt               DateTime               @default(now())
 
